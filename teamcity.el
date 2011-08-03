@@ -25,16 +25,27 @@
           "/httpAuth/app/rest/" url-end))
 
 
-(defun teamcity-rest (request)
+(defun teamcity-rest-buffer (request)
+  "Sends TeamCity REST request and returns a buffer with response"
   (let ((response-buffer (generate-new-buffer "teamcity-rest-response")))
     (save-current-buffer
       (set-buffer response-buffer)
       (url-insert-file-contents (teamcity-get-url-string request)))
     response-buffer))
 
+
+(defun teamcity-rest-xml (request)
+  "Sends TeamCity REST request and returns a parsed xml"
+  (let ((buf (teamcity-rest-buffer request)))
+    (with-current-buffer buf
+      (save-excursion
+        (xml-parse-region (point-min)
+                          (point-max)
+                          (current-buffer))))))
+
   
 (defun teamcity-get-version ()
-  (let ((response-buffer (teamcity-rest "version")))
+  (let ((response-buffer (teamcity-rest-buffer "version")))
     (save-current-buffer
       (set-buffer response-buffer)
       (buffer-string))))
