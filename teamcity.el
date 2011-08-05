@@ -1,5 +1,8 @@
 ;;;; Emacs TeamCity Client
 
+(require 'cl)
+
+
 (defgroup teamcity nil
   "Emacs interface for TeamCity."
   :prefix "teamcity-"
@@ -55,6 +58,42 @@
   "Display TeamCity version."
   (interactive)
   (message (concat "TeamCity version is " (teamcity-get-version))))
+
+
+(defun teamcity-projects()
+  "Display TeamCity projects"
+  (interactive)
+  (let* ((projects-buffer (get-buffer-create "*teamcity-projects*"))
+         (projects (teamcity-get-projects)))
+    (set-buffer projects-buffer)
+    (dolist (p projects nil)
+      (insert (concat "* " (teamcity-project-get-name p) "\n")))
+    (make-local-variable 'buffer-read-only)
+    (setq buffer-read-only t)
+    (switch-to-buffer projects-buffer)))
+
+
+(defun teamcity-get-projects ()
+  (parse-projects (teamcity-rest-xml "projects")))
+
+
+(defun teamcity-parse-projects (xml)
+  (let* ((root-node (car xml))
+         (projects (xml-node-children root-node)))
+    (mapcar* 'parse-project projects)))
+
+(defun teamcity-parse-project (xml)
+  (let ((id   (xml-get-attribute xml 'id))
+        (name (xml-get-attribute xml 'name)))
+    (list (cons 'id id) (cons 'name name))))
+
+
+(defun teamcity-project-get-name (project)
+  (cdr (assoc 'name project)))
+
+
+(defun teamcity-project-get-id (project)
+  (cdr (assoc 'id project)))
 
 
 (provide 'teamcity)
