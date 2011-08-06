@@ -18,6 +18,23 @@
   :group 'teamcity
   :type 'string)
 
+(defgroup teamcity-faces nil
+  "Customize TeamCity UI"
+  :prefix "teamcity-"
+  :group 'faces
+  :group 'teamcity)
+
+(defface teamcity-project
+  '((t :underline t
+       :foreground "blue"))
+  "Face for project."
+  :group 'teamcity-faces)
+
+(defface teamcity-project-star
+  '((t :foreground "blue"))
+  "Face for star near the projece."
+  :group 'teamcity-faces)
+
 
 (defun teamcity-get-url (url-end)
   (url-generic-parse-url (concat (teamcity-get-url-string url-end))))
@@ -72,8 +89,12 @@
              (end (point-at-eol))
              (project-id (teamcity-project-get-id p))
              (project-details-str (teamcity-get-url-string (concat "projects/id:" project-id))))
-        (put-text-property start end 'details project-details-str))
-      (insert "\n"))
+        (put-text-property start end 'details project-details-str)
+        (put-text-property start (+ start 1) 'face 'teamcity-project-star)
+        (put-text-property (+ start 2) end 'face 'teamcity-project)
+        (insert "\n")))
+    (backward-delete-char-untabify 1)
+    (beginning-of-buffer)
     (teamcity-mode)
     (switch-to-buffer projects-buffer)))
 
@@ -111,8 +132,8 @@
     (define-key map (kbd "q") 'bury-buffer)
     (define-key map (kbd "j") 'next-line)
     (define-key map (kbd "k") 'previous-line)
-    (define-key map (kbd "u") 'cua-scroll-up)
-    (define-key map (kbd "d") 'cua-scroll-down)
+    (define-key map (kbd "u") 'cua-scroll-down)
+    (define-key map (kbd "d") 'cua-scroll-up)
     map))
 
 
