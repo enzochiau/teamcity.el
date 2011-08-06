@@ -78,13 +78,13 @@
 
 
 (defun teamcity-get-projects ()
-  (parse-projects (teamcity-rest-xml "projects")))
+  (teamcity-parse-projects (teamcity-rest-xml "projects")))
 
 
 (defun teamcity-parse-projects (xml)
   (let* ((root-node (car xml))
          (projects (xml-node-children root-node)))
-    (mapcar* 'parse-project projects)))
+    (mapcar* 'teamcity-parse-project projects)))
 
 (defun teamcity-parse-project (xml)
   (let ((id   (xml-get-attribute xml 'id))
