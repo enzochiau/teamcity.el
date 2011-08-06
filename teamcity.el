@@ -56,19 +56,23 @@
 
 (defun teamcity-rest-xml (request)
   "Sends TeamCity REST request and returns a parsed xml"
-  (let ((buf (teamcity-rest-buffer request)))
-    (with-current-buffer buf
-      (save-excursion
-        (xml-parse-region (point-min)
-                          (point-max)
-                          (current-buffer))))))
+  (let* ((buf (teamcity-rest-buffer request))
+         (xml (with-current-buffer buf
+                (save-excursion
+                  (xml-parse-region (point-min)
+                                    (point-max)
+                                    (current-buffer))))))
+    (kill-buffer buf)
+    xml))
 
   
 (defun teamcity-get-version ()
   (let ((response-buffer (teamcity-rest-buffer "version")))
     (save-current-buffer
       (set-buffer response-buffer)
-      (buffer-string))))
+      (let ((version (buffer-string)))
+        (kill-buffer response-buffer)
+        version))))
 
 
 (defun teamcity-version ()
