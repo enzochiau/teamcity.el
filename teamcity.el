@@ -20,7 +20,7 @@
 
 
 (defun teamcity-get-url (url-end)
-  (url-generic-parse-url (concat (teamcity-get-base-url-string url-end))))
+  (url-generic-parse-url (concat (teamcity-get-url-string url-end))))
 
 
 (defun teamcity-get-url-string (url-end)
@@ -63,17 +63,18 @@
 (defun teamcity-projects()
   "Display TeamCity projects"
   (interactive)
-  (let* ((projects-buffer (get-buffer-create "*teamcity-projects*"))
+  (let* ((projects-buffer (get-buffer-create "*TeamCity: Projects*"))
          (projects (teamcity-get-projects)))
     (set-buffer projects-buffer)
     (dolist (p projects nil)
       (insert (concat "* " (teamcity-project-get-name p)))
-      (let ((start (point-at-bol))
-            (end (point-at-eol)))
-        (put-text-property start end 'id (teamcity-project-get-id p)))
+      (let* ((start (point-at-bol))
+             (end (point-at-eol))
+             (project-id (teamcity-project-get-id p))
+             (project-details-str (teamcity-get-url-string (concat "projects/id:" project-id))))
+        (put-text-property start end 'details project-details-str))
       (insert "\n"))
-    (make-local-variable 'buffer-read-only)
-    (setq buffer-read-only t)
+    (teamcity-mode)
     (switch-to-buffer projects-buffer)))
 
 
@@ -98,6 +99,40 @@
 
 (defun teamcity-project-get-id (project)
   (cdr (assoc 'id project)))
+
+
+(defvar teamcity-mode-hook nil)
+
+
+(defvar teamcity-mode-map
+  (let ((map (make-keymap)))
+    (suppress-keymap map t)
+    (define-key map (kbd "RET") 'teamcity-show-details)
+    (define-key map (kbd "q") 'bury-buffer)
+    (define-key map (kbd "j") 'next-line)
+    (define-key map (kbd "k") 'previous-line)
+    (define-key map (kbd "u") 'cua-scroll-up)
+    (define-key map (kbd "d") 'cua-scroll-down)
+    map))
+
+
+(defun teamcity-mode ()
+  ""
+  (interactive)
+  (kill-all-local-variables)
+  (buffer-disable-undo)
+  (setq buffer-read-only t)
+  (setq major-mode 'teamcity-mode
+        mode-name "TeamCity")
+  (use-local-map teamcity-mode-map)
+  (run-hooks 'teamcity-mode-hook))
+
+
+(defun teamcity-show-details ()
+  (interactive)
+  (let* ((details-str (get-text-property (point) 'details))
+         (details-url (teamcity-get-url details-str)))
+    ))
 
 
 (provide 'teamcity)
