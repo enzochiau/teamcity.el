@@ -88,10 +88,10 @@
          (projects (teamcity-get-projects)))
     (set-buffer projects-buffer)
     (dolist (p projects nil)
-      (insert (concat "+ " (teamcity-project-get-name p)))
+      (insert (concat "+ " (teamcity-get-field p 'name)))
       (let* ((start (point-at-bol))
              (end (point-at-eol))
-             (project-id (teamcity-project-get-id p))
+             (project-id (teamcity-get-field p 'id))
              (project-details-str (teamcity-get-url-string (concat "projects/id:" project-id))))
         (put-text-property start end 'teamcity-object-type 'project)
         (put-text-property start end 'id project-id)
@@ -122,8 +122,8 @@
                   (project-details (teamcity-parse-project-details project-details-xml)))
              (save-excursion
                (move-beginning-of-line 2)
-               (dolist (bt (teamcity-project-get-buildTypes project-details) nil)
-                 (insert (concat "  " (teamcity-object-get bt 'name)))
+               (dolist (bt (teamcity-get-field project-details 'buildTypes) nil)
+                 (insert (concat "  " (teamcity-get-field bt 'name)))
                  (insert "\n")
                  (save-excursion
                    (previous-line)
@@ -206,19 +206,7 @@
           (cons 'webUrl webUrl))))
 
 
-(defun teamcity-project-get-name (project)
-  (cdr (assoc 'name project)))
-
-
-(defun teamcity-project-get-id (project)
-  (cdr (assoc 'id project)))
-
-
-(defun teamcity-project-get-buildTypes (project)
-  (cdr (assoc 'buildTypes project)))
-
-
-(defun teamcity-object-get (object field-symbol)
+(defun teamcity-get-field (object field-symbol)
   (cdr (assoc field-symbol object)))
 
 
