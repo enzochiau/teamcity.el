@@ -100,7 +100,6 @@
         (put-text-property start end 'collapse 'teamcity-project-collapse)
         (put-text-property start end 'face 'teamcity-project)
         (insert "\n")))
-    (backward-delete-char-untabify 1)
     (beginning-of-buffer)
     (teamcity-mode)
     (switch-to-buffer projects-buffer)))
