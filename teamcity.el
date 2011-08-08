@@ -268,8 +268,10 @@
     (cond ((eq expanded 'yes)
            (funcall collapse)
            (put-text-property start end 'expanded 'no))
-          (t (funcall expand)
-             (put-text-property start end 'expanded 'yes)))))
+          (expand
+           (funcall expand)
+           (put-text-property start end 'expanded 'yes))
+          (t (message "There is nothing to expand here")))))
 
 
 
