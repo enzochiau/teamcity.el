@@ -35,13 +35,33 @@
   "Face for project."
   :group 'teamcity-faces)
 
+(defface teamcity-buildtype-name-header
+  '((t :foreground "blue"))
+  "Face for the name of build type on build type screen."
+  :group 'teamcity-faces)
+
+(defface teamcity-build-success
+  '((t :foreground "forest green"))
+  "Successful build."
+  :group 'teamcity-faces)
+
+(defface teamcity-build-fail
+  '((t :foreground "red2"))
+  "Failed build."
+  :group 'teamcity-faces)
+
+(defface teamcity-build-unknown
+  '((t :foreground "gray"))
+  "Failed to start/canceled build."
+  :group 'teamcity-faces)
+
 
 (defun teamcity-get-url (url-end)
   (url-generic-parse-url (concat (teamcity-get-url-string url-end))))
 
 
 (defun teamcity-get-url-string (url-end)
-  (concat "http://" teamcity-username "@" teamcity-server 
+  (concat "http://" teamcity-username "@" teamcity-server
           "/httpAuth/app/rest/" url-end))
 
 
@@ -65,7 +85,7 @@
     (kill-buffer buf)
     xml))
 
-  
+
 (defun teamcity-get-version ()
   (let ((response-buffer (teamcity-rest-buffer "version")))
     (save-current-buffer
@@ -95,7 +115,6 @@
              (project-details-str (teamcity-get-url-string (concat "projects/id:" project-id))))
         (put-text-property start end 'teamcity-object-type 'project)
         (put-text-property start end 'id project-id)
-        (put-text-property start end 'details project-details-str)
         (put-text-property start end 'expand 'teamcity-project-expand)
         (put-text-property start end 'collapse 'teamcity-project-collapse)
         (put-text-property start end 'face 'teamcity-project)
@@ -129,6 +148,8 @@
                    (previous-line)
                    (let ((bt-start (point-at-bol))
                        (bt-end (point-at-eol)))
+                     (put-text-property bt-start bt-end 'id (teamcity-get-field bt 'id))
+                     (put-text-property bt-start bt-end 'open 'teamcity-open-buildtype)
                      (put-text-property bt-start bt-end 'face 'teamcity-buildtype)))))
              (put-text-property start end 'project-details-loaded 'yes))))
     (save-excursion
@@ -149,6 +170,87 @@
       (goto-char (+ start 1))
       (insert-and-inherit "+")
       (delete-region start (+ start 1)))))
+
+
+(defun teamcity-open-buildtype ()
+  (interactive)
+  (let* ((id (get-text-property (point) 'id))
+         (details (teamcity-get-buildtype-details id))
+         (builds (teamcity-get-builds id))
+         (buffer (get-buffer-create "*TeamCity: Build Configuration*")))
+    (set-buffer buffer)
+    (teamcity-show-bt-header details)
+    (teamcity-show-bt-builds builds)
+    (beginning-of-buffer)
+    (teamcity-mode)
+    (switch-to-buffer buffer)))
+
+
+(defun teamcity-show-bt-header (bt-details)
+  (message (teamcity-get-field details 'name))
+  (insert (teamcity-get-field details 'name))
+  (put-text-property (point-at-bol) (point-at-eol) 'face 'teamcity-buildtype-name-header)
+  (insert "\n\n"))
+
+
+(defun teamcity-show-bt-builds (builds)
+  (dolist (b builds nil)
+    (insert (concat "+ " (teamcity-get-field b 'number)
+                    " " (teamcity-get-field b 'start)
+                    " " (teamcity-get-field b 'status)))
+    (put-text-property (point-at-bol) (point-at-eol) 'face (teamcity-build-get-face b))
+    (insert "\n")))
+
+
+(defun teamcity-build-get-face (build)
+  (let ((status (teamcity-get-field build 'status)))
+    (cond ((equal status "SUCCESS") 'teamcity-build-success)
+          ((or (equal status "FAILURE") (equal status "ERROR")) 'teamcity-build-fail)
+          (t 'teamcity-build-unknown))))
+
+
+
+(defun teamcity-get-buildtype-details (id)
+  (let* ((request (concat "buildTypes/" id))
+         (response (teamcity-rest-xml request)))
+    (teamcity-parse-buildtype-details response)))
+
+
+(defun teamcity-parse-buildtype-details (xml)
+  (let* ((root (car xml))
+         (id (xml-get-attribute root 'id))
+         (name (xml-get-attribute root 'name))
+         (webUrl (xml-get-attribute root 'webUrl)))
+    (list (cons 'id id)
+          (cons 'name name)
+          (cons 'weburl webUrl))))
+
+
+(defun teamcity-get-builds (buildtype-id)
+  (let* ((request (concat "builds?locator=buildType:" buildtype-id))
+         (response (teamcity-rest-xml request)))
+    (teamcity-parse-builds response)))
+
+
+(defun teamcity-parse-builds (xml)
+  (let* ((root (car xml))
+         (builds (xml-node-children root)))
+    (mapcar* 'teamcity-parse-build builds)))
+
+
+(defun teamcity-parse-build (xml)
+  (let ((id (xml-get-attribute xml 'id))
+        (number (xml-get-attribute xml 'number))
+        (status (xml-get-attribute xml 'status))
+        (start (xml-get-attribute xml 'startDate)))
+    (list (cons 'id id)
+          (cons 'number number)
+          (cons 'status status)
+          (cons 'start start))))
+
+
+(defun teamcity-parse-date (date)
+  date)
 
 
 (defun teamcity-get-next-object-point (object-type lines-forward)
@@ -216,7 +318,7 @@
 (defvar teamcity-mode-map
   (let ((map (make-keymap)))
     (suppress-keymap map t)
-    (define-key map (kbd "RET") 'teamcity-show-details)
+    (define-key map (kbd "RET") 'teamcity-open-new-window)
     (define-key map (kbd "TAB") 'teamcity-expand-collapse)
     (define-key map (kbd "q") 'bury-buffer)
     (define-key map (kbd "j") 'next-line)
@@ -238,11 +340,12 @@
   (run-hooks 'teamcity-mode-hook))
 
 
-(defun teamcity-show-details ()
+(defun teamcity-open-new-window ()
   (interactive)
-  (let* ((details-str (get-text-property (point) 'details))
-         (details-url (teamcity-get-url details-str)))
-    ))
+  (let* ((open (get-text-property (point) 'open)))
+    (if open
+        (funcall open)
+      (message "There is nothing to open here"))))
 
 
 (defun teamcity-expand-collapse ()
