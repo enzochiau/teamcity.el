@@ -196,8 +196,8 @@
 (defun teamcity-show-bt-builds (builds)
   (dolist (b builds nil)
     (insert (concat "+ " (teamcity-get-field b 'number)
-                    " " (teamcity-get-field b 'start)
-                    " " (teamcity-get-field b 'status)))
+                    "    " (teamcity-format-date (teamcity-get-field b 'start))
+                    "    " (teamcity-get-field b 'status)))
     (put-text-property (point-at-bol) (point-at-eol) 'face (teamcity-build-get-face b))
     (insert "\n")))
 
@@ -246,11 +246,31 @@
     (list (cons 'id id)
           (cons 'number number)
           (cons 'status status)
-          (cons 'start start))))
+          (cons 'start (teamcity-parse-date start)))))
 
 
 (defun teamcity-parse-date (date)
-  date)
+  (let ((year (substring date 0 4))
+        (month (substring date 4 6))
+        (day (substring date 6 8))
+        (hour (substring date 9 11))
+        (min (substring date 11 13))
+        (sec (substring date 13 15)))
+    (list (cons 'year year)
+          (cons 'month month)
+          (cons 'day day)
+          (cons 'hour hour)
+          (cons 'min min)
+          (cons 'sec sec))))
+
+
+(defun teamcity-format-date (date)
+  (concat (teamcity-get-field date 'day) "."
+          (teamcity-get-field date 'month) "."
+          (teamcity-get-field date 'year) " "
+          (teamcity-get-field date 'hour) ":"
+          (teamcity-get-field date 'min) ":"
+          (teamcity-get-field date 'sec)))
 
 
 (defun teamcity-get-next-object-point (object-type lines-forward)
