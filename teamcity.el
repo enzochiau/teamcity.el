@@ -193,12 +193,28 @@
 
 
 (defun teamcity-show-bt-builds (builds)
-  (dolist (b builds nil)
-    (insert (concat "+ " (teamcity-get-field b 'number)
-                    "    " (teamcity-format-date (teamcity-get-field b 'start))
-                    "    " (teamcity-get-field b 'status)))
-    (put-text-property (point-at-bol) (point-at-eol) 'face (teamcity-build-get-face b))
-    (insert "\n")))
+  (let* ((start (point-at-bol))
+         (max-widths (teamcity-get-max-column-width builds))
+         (number-width (teamcity-get-field max-widths 'number))
+         (status-width (teamcity-get-field max-widths 'status)))
+    (dolist (b builds nil)
+      (insert (concat "+ " (teamcity-ljust (teamcity-get-field b 'number) number-width)
+                      "   " (teamcity-format-date (teamcity-get-field b 'start))
+                      "   " (teamcity-rjust (teamcity-get-field b 'status) status-width)))
+      (put-text-property (point-at-bol) (point-at-eol) 'face (teamcity-build-get-face b))
+      (insert "\n"))))
+
+
+(defun teamcity-get-max-column-width (builds)
+  (reduce (lambda (x y)
+            (let ((number-len (length (teamcity-get-field y 'number)))
+                  (status-len (length (teamcity-get-field y 'status)))
+                  (number-max (teamcity-get-field x 'number))
+                  (status-max (teamcity-get-field x 'status)))
+              (list (cons 'number (max number-max number-len))
+                    (cons 'status (max status-max status-len)))))
+          builds
+          :initial-value (list (cons 'number 0) (cons 'status 0))))
 
 
 (defun teamcity-build-get-face (build)
@@ -383,6 +399,21 @@
            (put-text-property start end 'expanded 'yes))
           (t (message "There is nothing to expand here")))))
 
+
+(defun teamcity-ljust (str width)
+  (let ((len (length str)))
+    (cond ((<= len width)
+           (concat str (make-string (- width len) ? )))
+          (t
+           (substring str 0 width)))))
+
+
+(defun teamcity-rjust (str width)
+  (let ((len (length str)))
+    (cond ((<= len width)
+           (concat (make-string (- width len) ? ) str))
+          (t
+           (substring str (- len width) len)))))
 
 
 (provide 'teamcity)
