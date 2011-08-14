@@ -74,6 +74,26 @@
     response-buffer))
 
 
+(defun teamcity-send-put-request (request request-data)
+  (let* ((buf (generate-new-buffer "teamcity-rest-response"))
+         (url-request-method "PUT")
+         (url-request-data request-data)
+         (url (teamcity-get-url request)))
+	  (with-current-buffer buf
+      (url-retrieve-synchronously url)
+      'ok)))
+
+
+(defun teamcity-send-delete-request (request request-data)
+  (let* ((buf (generate-new-buffer "teamcity-rest-response"))
+         (url-request-method "DELETE")
+         (url-request-data request-data)
+         (url (teamcity-get-url request)))
+	  (with-current-buffer buf
+      (url-retrieve-synchronously url)
+      'ok)))
+
+
 (defun teamcity-rest-xml (request)
   "Sends TeamCity REST request and returns a parsed xml"
   (let* ((buf (teamcity-rest-buffer request))
@@ -86,13 +106,17 @@
     xml))
 
 
+(defun teamcity-rest-text (request)
+  "Sends TeamCity REST request and returns a response as a text"
+  (let* ((buf (teamcity-rest-buffer request))
+         (response (with-current-buffer buf
+                     (buffer-string))))
+    (kill-buffer buf)
+    response))
+
+
 (defun teamcity-get-version ()
-  (let ((response-buffer (teamcity-rest-buffer "version")))
-    (save-current-buffer
-      (set-buffer response-buffer)
-      (let ((version (buffer-string)))
-        (kill-buffer response-buffer)
-        version))))
+  (teamcity-rest-text "version"))
 
 
 (defun teamcity-version ()
@@ -182,6 +206,7 @@
     (teamcity-show-bt-builds builds)
     (beginning-of-buffer)
     (teamcity-mode)
+    (teamcity-buildtype-mode)
     (switch-to-buffer buffer)))
 
 
@@ -198,11 +223,16 @@
          (number-width (teamcity-get-field max-widths 'number))
          (status-width (teamcity-get-field max-widths 'status)))
     (dolist (b builds nil)
-      (insert (concat "+ " (teamcity-ljust (teamcity-get-field b 'number) number-width)
-                      "   " (teamcity-format-date (teamcity-get-field b 'start))
-                      "   " (teamcity-rjust (teamcity-get-field b 'status) status-width)))
-      (put-text-property (point-at-bol) (point-at-eol) 'face (teamcity-build-get-face b))
-      (insert "\n"))))
+      (let ((pinned (teamcity-is-build-pinned (teamcity-get-field b 'id))))
+        (insert (concat "+ " (teamcity-ljust (teamcity-get-field b 'number) number-width)
+                        "   " (teamcity-format-date (teamcity-get-field b 'start))
+                        "   " (teamcity-rjust (teamcity-get-field b 'status) status-width)
+                        (if pinned "    pinned")))
+        (put-text-property (point-at-bol) (point-at-eol) 'face (teamcity-build-get-face b))
+        (put-text-property (point-at-bol) (point-at-eol) 'id (teamcity-get-field b 'id))
+        (put-text-property (point-at-bol) (point-at-eol) 'teamcity-object-type 'build)
+        (put-text-property (point-at-bol) (point-at-eol) 'pinned pinned)
+        (insert "\n")))))
 
 
 (defun teamcity-get-max-column-width (builds)
@@ -292,12 +322,12 @@
   (save-excursion
     (move-beginning-of-line (+ lines-forward 1))
     (while (and (not (eobp))
-                (not (eq (teamcity-get-current-line-object-type) object-type)))
+                (not (eq (teamcity-object-type-at-point) object-type)))
       (next-line))
     (point)))
 
 
-(defun teamcity-get-current-line-object-type()
+(defun teamcity-object-type-at-point()
   (get-text-property (point) 'teamcity-object-type))
 
 
@@ -363,6 +393,12 @@
     map))
 
 
+(defvar teamcity-buildtype-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "p") 'teamcity-toggle-build-pin)
+    map))
+
+
 (defun teamcity-mode ()
   ""
   (interactive)
@@ -374,6 +410,13 @@
   (use-local-map teamcity-mode-map)
   (run-hooks 'teamcity-mode-hook))
 
+
+(define-minor-mode teamcity-buildtype-mode
+    "Minor mode to view a build type details."
+  :group teamcity
+  :init-value ()
+  :lighter ()
+  :keymap teamcity-buildtype-mode-map)
 
 (defun teamcity-open-new-window ()
   (interactive)
@@ -414,6 +457,39 @@
            (concat (make-string (- width len) ? ) str))
           (t
            (substring str (- len width) len)))))
+
+
+(defun teamcity-get-build-pin-request (build-id)
+  (concat "builds/id:" build-id "/pin/"))
+
+
+(defun teamcity-pin-build (build-id comment)
+  (let ((request (teamcity-get-build-pin-request build-id)))
+    (teamcity-send-put-request request comment)))
+
+
+(defun teamcity-unpin-build (build-id comment)
+  (let ((request (teamcity-get-build-pin-request build-id)))
+    (teamcity-send-delete-request request comment)))
+
+
+(defun teamcity-is-build-pinned (build-id)
+  (let* ((request (teamcity-get-build-pin-request build-id))
+         (response (teamcity-rest-text request)))
+    (string= response "true")))
+
+
+(defun teamcity-toggle-build-pin ()
+  (interactive)
+  (let ((type (teamcity-object-type-at-point)))
+    (if (not (eq type 'build))
+        (message "Nothing to pin")
+      (let ((build-id (get-text-property (point) 'id))
+            (pinned (get-text-property (point) 'pinned))
+            (comment (read-string "Comment: ")))
+        (if pinned
+            (teamcity-unpin-build build-id comment)
+          (teamcity-pin-build build-id comment))))))
 
 
 (provide 'teamcity)
