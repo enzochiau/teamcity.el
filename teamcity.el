@@ -18,6 +18,11 @@
   :group 'teamcity
   :type 'string)
 
+(defcustom teamcity-builds-count 10
+  "Initial number of builds in the build configuration view."
+  :group 'teamcity
+  :type 'int)
+
 (defgroup teamcity-faces nil
   "Customize TeamCity UI"
   :prefix "teamcity-"
@@ -199,7 +204,7 @@
   (interactive)
   (let* ((id (get-text-property (point) 'id))
          (details (teamcity-get-buildtype-details id))
-         (builds (teamcity-get-builds id))
+         (builds (teamcity-get-builds :buildType id :count teamcity-builds-count))
          (buffer (get-buffer-create "*TeamCity: Build Configuration*")))
     (set-buffer buffer)
     (teamcity-show-bt-header details)
