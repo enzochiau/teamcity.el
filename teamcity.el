@@ -222,17 +222,8 @@
          (max-widths (teamcity-get-max-column-width builds))
          (number-width (teamcity-get-field max-widths 'number))
          (status-width (teamcity-get-field max-widths 'status)))
-    (dolist (b builds nil)
-      (let ((pinned (teamcity-is-build-pinned (teamcity-get-field b 'id))))
-        (insert (concat "+ " (teamcity-ljust (teamcity-get-field b 'number) number-width)
-                        "   " (teamcity-format-date (teamcity-get-field b 'start))
-                        "   " (teamcity-rjust (teamcity-get-field b 'status) status-width)
-                        (if pinned "    pinned")))
-        (put-text-property (point-at-bol) (point-at-eol) 'face (teamcity-build-get-face b))
-        (put-text-property (point-at-bol) (point-at-eol) 'id (teamcity-get-field b 'id))
-        (put-text-property (point-at-bol) (point-at-eol) 'teamcity-object-type 'build)
-        (put-text-property (point-at-bol) (point-at-eol) 'pinned pinned)
-        (insert "\n")))))
+    (dolist (build builds nil)
+      (teamcity-show-bt-build build number-width status-width))))
 
 
 (defun teamcity-get-max-column-width (builds)
@@ -247,12 +238,24 @@
           :initial-value (list (cons 'number 0) (cons 'status 0))))
 
 
+(defun teamcity-show-bt-build (build number-width status-width)
+  (let ((pinned (teamcity-is-build-pinned (teamcity-get-field build 'id))))
+    (insert (concat "+ " (teamcity-ljust (teamcity-get-field build 'number) number-width)
+                    "   " (teamcity-format-date (teamcity-get-field build 'start))
+                    "   " (teamcity-rjust (teamcity-get-field build 'status) status-width)
+                    (if pinned "    pinned")))
+    (put-text-property (point-at-bol) (point-at-eol) 'face (teamcity-build-get-face build))
+    (put-text-property (point-at-bol) (point-at-eol) 'id (teamcity-get-field build 'id))
+    (put-text-property (point-at-bol) (point-at-eol) 'teamcity-object-type 'build)
+    (put-text-property (point-at-bol) (point-at-eol) 'pinned pinned)
+    (insert "\n")))
+
+
 (defun teamcity-build-get-face (build)
   (let ((status (teamcity-get-field build 'status)))
     (cond ((equal status "SUCCESS") 'teamcity-build-success)
           ((or (equal status "FAILURE") (equal status "ERROR")) 'teamcity-build-fail)
           (t 'teamcity-build-unknown))))
-
 
 
 (defun teamcity-get-buildtype-details (id)
@@ -271,8 +274,34 @@
           (cons 'weburl webUrl))))
 
 
-(defun teamcity-get-builds (buildtype-id)
-  (let* ((request (concat "builds?locator=buildType:" buildtype-id))
+(defun teamcity-builds-request (&rest build-locator)
+  (concat "builds?locator="
+          (teamcity-serialize-locator build-locator)))
+
+
+(defun teamcity-serialize-locator (locator)
+  (teamcity-serialize-locator* locator ""))
+
+(defun teamcity-serialize-locator* (locator result)
+  (if (not locator)
+      result
+    (let* ((head (car locator))
+           (tail (cdr locator))
+           (dimension (and (symbolp head)
+                           (equal (substring (symbol-name head) 0 1) ":")
+                           (substring (symbol-name head) 1)))
+           (coma (if (> (length result) 0) "," "")))
+      (if (and dimension tail)
+          (let* ((val (car tail))
+                 (strval (if (stringp val) val (number-to-string val))))
+            (teamcity-serialize-locator*
+             (cdr tail)
+             (concat result (and (> (length result) 0) ",") dimension ":" strval)))
+        (teamcity-serialize-locator* tail result)))))
+
+
+(defun teamcity-get-builds (&rest build-locator)
+  (let* ((request (apply 'teamcity-builds-request build-locator))
          (response (teamcity-rest-xml request)))
     (teamcity-parse-builds response)))
 
