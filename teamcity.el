@@ -486,7 +486,7 @@
         (message "Nothing to pin")
       (let ((build-id (get-text-property (point) 'id))
             (pinned (get-text-property (point) 'pinned))
-            (comment (read-string "Comment: ")))
+            (comment (read-string (if pinned "Unpin comment: " "Pin comment: "))))
         (if pinned
             (teamcity-unpin-build build-id comment)
           (teamcity-pin-build build-id comment))))))
