@@ -249,11 +249,34 @@
                     "   " (teamcity-format-date (teamcity-get-field build 'start))
                     "   " (teamcity-rjust (teamcity-get-field build 'status) status-width)
                     (if pinned "    pinned")))
-    (put-text-property (point-at-bol) (point-at-eol) 'face (teamcity-build-get-face build))
-    (put-text-property (point-at-bol) (point-at-eol) 'id (teamcity-get-field build 'id))
-    (put-text-property (point-at-bol) (point-at-eol) 'teamcity-object-type 'build)
-    (put-text-property (point-at-bol) (point-at-eol) 'pinned pinned)
+    (let ((start (point-at-bol))
+          (end (point-at-eol)))
+      (put-text-property start end 'face (teamcity-build-get-face build))
+      (put-text-property start end 'id (teamcity-get-field build 'id))
+      (put-text-property start end 'teamcity-object-type 'build)
+      (put-text-property start end 'pinned pinned)
+      (put-text-property start end 'build build)
+      (put-text-property start end 'number-width number-width)
+      (put-text-property start end 'status-width status-width))
     (insert "\n")))
+
+
+(defun teamcity-refresh-build-at (point)
+  (let ((inhibit-read-only t)
+        (number-width (get-text-property (point) 'number-width))
+        (status-width (get-text-property (point) 'status-width))
+        (build (get-text-property (point) 'build))
+        (start (point-at-bol)))
+    (teamcity-remove-build-at point)
+    (goto-char start)
+    (teamcity-show-bt-build build number-width status-width)
+    (goto-char start)))
+
+
+(defun teamcity-remove-build-at (point)
+  (let ((start (point-at-bol))
+        (end (+ (point-at-eol) 1)))
+    (delete-region start end)))
 
 
 (defun teamcity-build-get-face (build)
@@ -515,15 +538,17 @@
 
 (defun teamcity-toggle-build-pin ()
   (interactive)
-  (let ((type (teamcity-object-type-at-point)))
+  (let ((point (point))
+        (type (teamcity-object-type-at-point)))
     (if (not (eq type 'build))
         (message "Nothing to pin")
-      (let ((build-id (get-text-property (point) 'id))
-            (pinned (get-text-property (point) 'pinned))
-            (comment (read-string (if pinned "Unpin comment: " "Pin comment: "))))
+      (let* ((build-id (get-text-property point 'id))
+             (pinned (get-text-property point 'pinned))
+             (comment (read-string (if pinned "Unpin comment: " "Pin comment: "))))
         (if pinned
             (teamcity-unpin-build build-id comment)
-          (teamcity-pin-build build-id comment))))))
+          (teamcity-pin-build build-id comment))
+        (teamcity-refresh-build-at point)))))
 
 
 (provide 'teamcity)
