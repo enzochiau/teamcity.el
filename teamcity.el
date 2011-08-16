@@ -239,8 +239,7 @@
 
 
 (defun teamcity-show-bt-header (bt-details)
-  (message (teamcity-get-field details 'name))
-  (insert (teamcity-get-field details 'name))
+  (insert (teamcity-buildtype-get-fullname bt-details))
   (put-text-property (point-at-bol) (point-at-eol) 'face 'teamcity-buildtype-name-header)
   (insert "\n\n\n"))
 
@@ -338,10 +337,18 @@
   (let* ((root (car xml))
          (id (xml-get-attribute root 'id))
          (name (xml-get-attribute root 'name))
+         (project-name (xml-get-attribute (car (xml-get-children root 'project)) 'name))
          (webUrl (xml-get-attribute root 'webUrl)))
     (list (cons 'id id)
           (cons 'name name)
+          (cons 'project-name project-name)
           (cons 'weburl webUrl))))
+
+
+(defun teamcity-buildtype-get-fullname (bt)
+  (let ((name (teamcity-get-field bt 'name))
+        (project-name (teamcity-get-field bt 'project-name)))
+    (concat project-name " :: " name)))
 
 
 (defun teamcity-builds-request (&rest build-locator)
