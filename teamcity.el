@@ -143,8 +143,7 @@
     (beginning-of-buffer)
     (teamcity-mode)
     (switch-to-buffer projects-buffer)
-    (make-local-variable 'teamcity-refresh-fn)
-    (setq teamcity-refresh-fn 'teamcity-projects)))
+    (teamcity-set-refresh-fn 'teamcity-projects)))
 
 
 (defun teamcity-show-project (p)
@@ -210,17 +209,31 @@
 
 (defun teamcity-open-buildtype ()
   (interactive)
-  (let* ((id (get-text-property (point) 'id))
-         (details (teamcity-get-buildtype-details id))
-         (builds (teamcity-get-builds :buildType id :count teamcity-builds-count))
-         (buffer (get-buffer-create "*TeamCity: Build Configuration*")))
+  (let ((id (get-text-property (point) 'id)))
+    (teamcity-show-buildtype id)))
+
+
+(defun teamcity-show-buildtype (btid)
+  (let* ((details (teamcity-get-buildtype-details btid))
+         (builds (teamcity-get-builds :buildType btid :count teamcity-builds-count))
+         (buffer (get-buffer-create (concat "*TeamCity: Build Configuration " btid "*")))
+         (inhibit-read-only t))
     (set-buffer buffer)
+    (erase-buffer)
     (teamcity-show-bt-header details)
     (teamcity-show-bt-builds builds)
     (beginning-of-buffer)
     (teamcity-mode)
     (teamcity-buildtype-mode)
-    (switch-to-buffer buffer)))
+    (switch-to-buffer buffer)
+    (make-local-variable 'btid)
+    (setq btid btid)
+    (teamcity-set-refresh-fn 'teamcity-refresh-buildtype)))
+
+
+(defun teamcity-refresh-buildtype ()
+  (let ((id (buffer-local-value 'btid (current-buffer))))
+    (teamcity-show-buildtype id)))
 
 
 (defun teamcity-show-bt-header (bt-details)
@@ -565,6 +578,11 @@
   (if (local-variable-p 'teamcity-refresh-fn)
       (funcall (buffer-local-value 'teamcity-refresh-fn (current-buffer)))
     (message "Nothing to refresh")))
+
+
+(defun teamcity-set-refresh-fn (refresh-fn)
+  (make-local-variable 'teamcity-refresh-fn)
+  (setq teamcity-refresh-fn refresh-fn))
 
 
 (provide 'teamcity)
