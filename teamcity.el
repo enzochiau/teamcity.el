@@ -216,11 +216,13 @@
 (defun teamcity-show-buildtype (btid)
   (let* ((details (teamcity-get-buildtype-details btid))
          (builds (teamcity-get-builds :buildType btid :count teamcity-builds-count))
+         (running-builds (teamcity-get-builds :buildType btid :running "true"))
          (buffer (get-buffer-create (concat "*TeamCity: Build Configuration " btid "*")))
          (inhibit-read-only t))
     (set-buffer buffer)
     (erase-buffer)
     (teamcity-show-bt-header details)
+    (teamcity-show-running-builds running-builds)
     (teamcity-show-bt-builds builds)
     (beginning-of-buffer)
     (teamcity-mode)
@@ -240,6 +242,11 @@
   (message (teamcity-get-field details 'name))
   (insert (teamcity-get-field details 'name))
   (put-text-property (point-at-bol) (point-at-eol) 'face 'teamcity-buildtype-name-header)
+  (insert "\n\n\n"))
+
+
+(defun teamcity-show-running-builds (running-builds)
+  (teamcity-show-bt-builds running-builds)
   (insert "\n\n"))
 
 
@@ -265,10 +272,12 @@
 
 
 (defun teamcity-show-bt-build (build number-width status-width)
-  (let ((pinned (teamcity-is-build-pinned (teamcity-get-field build 'id))))
+  (let ((pinned (teamcity-is-build-pinned (teamcity-get-field build 'id)))
+        (percent-str (teamcity-get-build-percentage-str build)))
     (insert (concat "+ " (teamcity-ljust (teamcity-get-field build 'number) number-width)
                     "   " (teamcity-format-date (teamcity-get-field build 'start))
                     "   " (teamcity-rjust (teamcity-get-field build 'status) status-width)
+                    (if percent-str (concat "   " percent-str))
                     (if pinned "    pinned")))
     (let ((start (point-at-bol))
           (end (point-at-eol)))
@@ -280,6 +289,18 @@
       (put-text-property start end 'number-width number-width)
       (put-text-property start end 'status-width status-width))
     (insert "\n")))
+
+
+(defun teamcity-get-build-percentage-str (build)
+  (let ((percentage (teamcity-get-field build 'percentage)))
+    (if percentage
+        (let ((p (/ (string-to-number percentage) 10)))
+          (concat "["
+                  (make-string p ?#)
+                  (make-string (- 10 p) ? )
+                  "] "
+                  percentage
+                  "%")))))
 
 
 (defun teamcity-refresh-build-at (point)
@@ -365,11 +386,13 @@
   (let ((id (xml-get-attribute xml 'id))
         (number (xml-get-attribute xml 'number))
         (status (xml-get-attribute xml 'status))
-        (start (xml-get-attribute xml 'startDate)))
+        (start (xml-get-attribute xml 'startDate))
+        (percentage (xml-get-attribute-or-nil xml 'percentageComplete)))
     (list (cons 'id id)
           (cons 'number number)
           (cons 'status status)
-          (cons 'start (teamcity-parse-date start)))))
+          (cons 'start (teamcity-parse-date start))
+          (cons 'percentage percentage))))
 
 
 (defun teamcity-parse-date (date)
