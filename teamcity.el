@@ -223,7 +223,7 @@
     (erase-buffer)
     (teamcity-show-bt-header details)
     (teamcity-show-running-builds running-builds)
-    (teamcity-show-bt-builds builds)
+    (teamcity-show-bt-builds builds "History:")
     (beginning-of-buffer)
     (teamcity-mode)
     (teamcity-buildtype-mode)
@@ -245,15 +245,18 @@
 
 
 (defun teamcity-show-running-builds (running-builds)
-  (teamcity-show-bt-builds running-builds)
-  (insert "\n\n"))
+  (if running-builds
+      (progn
+        (teamcity-show-bt-builds running-builds "Running builds:")
+        (insert "\n\n"))))
 
 
-(defun teamcity-show-bt-builds (builds)
+(defun teamcity-show-bt-builds (builds &optional header)
   (let* ((start (point-at-bol))
          (max-widths (teamcity-get-max-column-width builds))
          (number-width (teamcity-get-field max-widths 'number))
          (status-width (teamcity-get-field max-widths 'status)))
+    (if header (insert (concat header "\n")))
     (dolist (build builds nil)
       (teamcity-show-bt-build build number-width status-width))))
 
