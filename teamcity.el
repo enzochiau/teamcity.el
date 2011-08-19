@@ -228,13 +228,13 @@
     (teamcity-mode)
     (teamcity-buildtype-mode)
     (switch-to-buffer buffer)
-    (make-local-variable 'btid)
-    (setq btid btid)
+    (make-local-variable 'teamcity-buildtype-id)
+    (setq teamcity-buildtype-id btid)
     (teamcity-set-refresh-fn 'teamcity-refresh-buildtype)))
 
 
 (defun teamcity-refresh-buildtype ()
-  (let ((id (buffer-local-value 'btid (current-buffer))))
+  (let ((id (buffer-local-value 'teamcity-buildtype-id (current-buffer))))
     (teamcity-show-buildtype id)))
 
 
@@ -508,6 +508,7 @@
 (defvar teamcity-buildtype-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "p") 'teamcity-toggle-build-pin)
+    (define-key map (kbd "r") 'teamcity-run-build)
     map))
 
 
@@ -616,6 +617,21 @@
 (defun teamcity-set-refresh-fn (refresh-fn)
   (make-local-variable 'teamcity-refresh-fn)
   (setq teamcity-refresh-fn refresh-fn))
+
+
+(defun teamcity-run-build ()
+  (interactive)
+  (let ((id (buffer-local-value 'teamcity-buildtype-id (current-buffer))))
+    (teamcity-run-build-for-buildtype id)))
+
+
+(defun teamcity-run-build-for-buildtype (id)
+  (let ((response-buffer (generate-new-buffer "teamcity-rest-response")))
+    (save-current-buffer
+      (set-buffer response-buffer)
+      (url-insert-file-contents
+       (concat "http://" teamcity-username "@" teamcity-server "/httpAuth/action.html?add2Queue=" id)))
+    'ok))
 
 
 (provide 'teamcity)
