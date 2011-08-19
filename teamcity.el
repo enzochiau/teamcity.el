@@ -222,7 +222,8 @@
     (set-buffer buffer)
     (erase-buffer)
     (teamcity-show-bt-header details)
-    (teamcity-show-running-builds running-builds)
+    (teamcity-show-bt-builds running-builds "Running builds:")
+    (insert "\n\n")
     (teamcity-show-bt-builds builds "History:")
     (beginning-of-buffer)
     (teamcity-mode)
@@ -242,13 +243,6 @@
   (insert (teamcity-buildtype-get-fullname bt-details))
   (put-text-property (point-at-bol) (point-at-eol) 'face 'teamcity-buildtype-name-header)
   (insert "\n\n\n"))
-
-
-(defun teamcity-show-running-builds (running-builds)
-  (if running-builds
-      (progn
-        (teamcity-show-bt-builds running-builds "Running builds:")
-        (insert "\n\n"))))
 
 
 (defun teamcity-show-bt-builds (builds &optional header)
