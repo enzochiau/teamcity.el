@@ -210,21 +210,24 @@
 (defun teamcity-show-bt-build (build number-width status-width)
   (let ((pinned (teamcity-is-build-pinned (teamcity-get-field build 'id)))
         (percent-str (teamcity-get-build-percentage-str build)))
-    (insert (concat "+ " (teamcity-ljust (teamcity-get-field build 'number) number-width)
-                    "   " (teamcity-format-date (teamcity-get-field build 'start))
-                    "   " (teamcity-rjust (teamcity-get-field build 'status) status-width)
-                    (if percent-str (concat "   " percent-str))
-                    (if pinned "    pinned")))
-    (let ((start (point-at-bol))
-          (end (point-at-eol)))
-      (put-text-property start end 'face (teamcity-build-get-face build))
-      (put-text-property start end 'id (teamcity-get-field build 'id))
-      (put-text-property start end 'teamcity-object-type 'build)
-      (put-text-property start end 'pinned pinned)
-      (put-text-property start end 'build build)
-      (put-text-property start end 'number-width number-width)
-      (put-text-property start end 'status-width status-width))
-    (insert "\n")))
+    (insert
+     (propertize (teamcity-get-bt-build-line build number-width status-width pinned percent-str)
+                 'face (teamcity-build-get-face build)
+                 'id (teamcity-get-field build 'id)
+                 'teamcity-object-type 'build
+                 'pinned pinned
+                 'build build
+                 'number-width number-width
+                 'status-width status-width))))
+
+
+(defun teamcity-get-bt-build-line (build number-width status-width pinned percent-str)
+  (concat "+ "  (teamcity-ljust (teamcity-get-field build 'number) number-width)
+          "   " (teamcity-format-date (teamcity-get-field build 'start))
+          "   " (teamcity-rjust (teamcity-get-field build 'status) status-width)
+          (if percent-str (concat "   " percent-str))
+          (if pinned "    pinned")
+          "\n"))
 
 
 (defun teamcity-get-build-percentage-str (build)
@@ -459,11 +462,12 @@
 
 
 (define-minor-mode teamcity-buildtype-mode
-    "Minor mode to view a build type details."
+  "Minor mode to view a build type details."
   :group teamcity
   :init-value ()
   :lighter ()
   :keymap teamcity-buildtype-mode-map)
+
 
 (defun teamcity-open-new-window ()
   (interactive)
