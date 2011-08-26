@@ -89,16 +89,13 @@
 
 
 (defun teamcity-show-project (p)
-  (insert (concat "+ " (teamcity-get-field p 'name)))
-  (let* ((start (point-at-bol))
-         (end (point-at-eol))
-         (project-id (teamcity-get-field p 'id)))
-    (put-text-property start end 'teamcity-object-type 'project)
-    (put-text-property start end 'id project-id)
-    (put-text-property start end 'expand 'teamcity-project-expand)
-    (put-text-property start end 'collapse 'teamcity-project-collapse)
-    (put-text-property start end 'face 'teamcity-project))
-  (insert "\n"))
+  (insert
+   (propertize (concat "+ " (teamcity-get-field p 'name) "\n")
+               'teamcity-object-type 'project
+               'id (teamcity-get-field p 'id)
+               'expand 'teamcity-project-expand
+               'collapse 'teamcity-project-collapse
+               'face 'teamcity-project)))
 
 
 (defun teamcity-project-expand ()
