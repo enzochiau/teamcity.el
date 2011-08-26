@@ -100,33 +100,26 @@
 
 (defun teamcity-project-expand ()
   (interactive)
-  (let ((start (point-at-bol))
-        (end (point-at-eol))
-        (details-loaded (get-text-property (point) 'project-details-loaded)))
-    (cond ((eq details-loaded 'yes)
-           (let ((contents (get-text-property (point) 'contents)))
-             (save-excursion
+  (save-excursion
+    (let ((start (point-at-bol))
+          (end (point-at-eol))
+          (details-loaded (get-text-property (point) 'project-details-loaded)))
+      (cond ((eq details-loaded 'yes)
+             (let ((contents (get-text-property (point) 'contents)))
                (move-beginning-of-line 2)
-               (insert contents))))
-          (t
-           (let* ((project-id (get-text-property (point) 'id))
-                  (project-details-request (concat "projects/id:" project-id))
-                  (project-details-xml (teamcity-rest-xml project-details-request))
-                  (project-details (teamcity-parse-project-details project-details-xml)))
-             (save-excursion
+               (insert contents)))
+            (t
+             (let* ((project-id (get-text-property (point) 'id))
+                    (project-details-request (concat "projects/id:" project-id))
+                    (project-details-xml (teamcity-rest-xml project-details-request))
+                    (project-details (teamcity-parse-project-details project-details-xml)))
                (move-beginning-of-line 2)
                (dolist (bt (teamcity-get-field project-details 'buildTypes) nil)
-                 (insert (concat "  " (teamcity-get-field bt 'name)))
-                 (insert "\n")
-                 (save-excursion
-                   (previous-line)
-                   (let ((bt-start (point-at-bol))
-                       (bt-end (point-at-eol)))
-                     (put-text-property bt-start bt-end 'id (teamcity-get-field bt 'id))
-                     (put-text-property bt-start bt-end 'open 'teamcity-open-buildtype)
-                     (put-text-property bt-start bt-end 'face 'teamcity-buildtype)))))
-             (put-text-property start end 'project-details-loaded 'yes))))
-    (save-excursion
+                 (insert (propertize (concat "  " (teamcity-get-field bt 'name) "\n")
+                                     'id (teamcity-get-field bt 'id)
+                                     'open 'teamcity-open-buildtype
+                                     'face 'teamcity-buildtype)))
+               (put-text-property start end 'project-details-loaded 'yes))))
       (goto-char (+ start 1))
       (insert-and-inherit "-")
       (delete-region start (+ start 1)))))
