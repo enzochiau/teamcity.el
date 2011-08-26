@@ -61,65 +61,6 @@
   :group 'teamcity-faces)
 
 
-(defun teamcity-get-url (url-end)
-  (url-generic-parse-url (concat (teamcity-get-url-string url-end))))
-
-
-(defun teamcity-get-url-string (url-end)
-  (concat "http://" teamcity-username "@" teamcity-server
-          "/httpAuth/app/rest/" url-end))
-
-
-(defun teamcity-rest-buffer (request)
-  "Sends TeamCity REST request and returns a buffer with response"
-  (let ((response-buffer (generate-new-buffer "teamcity-rest-response")))
-    (save-current-buffer
-      (set-buffer response-buffer)
-      (url-insert-file-contents (teamcity-get-url-string request)))
-    response-buffer))
-
-
-(defun teamcity-send-put-request (request request-data)
-  (let* ((buf (generate-new-buffer "teamcity-rest-response"))
-         (url-request-method "PUT")
-         (url-request-data request-data)
-         (url (teamcity-get-url request)))
-	  (with-current-buffer buf
-      (url-retrieve-synchronously url)
-      'ok)))
-
-
-(defun teamcity-send-delete-request (request request-data)
-  (let* ((buf (generate-new-buffer "teamcity-rest-response"))
-         (url-request-method "DELETE")
-         (url-request-data request-data)
-         (url (teamcity-get-url request)))
-	  (with-current-buffer buf
-      (url-retrieve-synchronously url)
-      'ok)))
-
-
-(defun teamcity-rest-xml (request)
-  "Sends TeamCity REST request and returns a parsed xml"
-  (let* ((buf (teamcity-rest-buffer request))
-         (xml (with-current-buffer buf
-                (save-excursion
-                  (xml-parse-region (point-min)
-                                    (point-max)
-                                    (current-buffer))))))
-    (kill-buffer buf)
-    xml))
-
-
-(defun teamcity-rest-text (request)
-  "Sends TeamCity REST request and returns a response as a text"
-  (let* ((buf (teamcity-rest-buffer request))
-         (response (with-current-buffer buf
-                     (buffer-string))))
-    (kill-buffer buf)
-    response))
-
-
 (defun teamcity-get-version ()
   (teamcity-rest-text "version"))
 
@@ -626,6 +567,66 @@
       (url-insert-file-contents
        (concat "http://" teamcity-username "@" teamcity-server "/httpAuth/action.html?add2Queue=" id)))
     'ok))
+
+
+;; Transport:
+
+(defun teamcity-mk-rest-url-string (rest-request)
+  (concat "http://" teamcity-username "@" teamcity-server
+          "/httpAuth/app/rest/" rest-request))
+
+
+(defun teamcity-get-rest-url (rest-request)
+  (url-generic-parse-url (concat (teamcity-mk-rest-url-string rest-request))))
+
+
+(defun teamcity-rest-buffer (request)
+  "Sends TeamCity REST request and returns a buffer with response"
+  (let ((response-buffer (generate-new-buffer "teamcity-rest-response")))
+    (save-current-buffer
+      (set-buffer response-buffer)
+      (url-insert-file-contents (teamcity-mk-rest-url-string request)))
+    response-buffer))
+
+
+(defun teamcity-send-put-request (request request-data)
+  (let* ((buf (generate-new-buffer "teamcity-rest-response"))
+         (url-request-method "PUT")
+         (url-request-data request-data)
+         (url (teamcity-get-rest-url request)))
+	  (with-current-buffer buf
+      (url-retrieve-synchronously url)
+      'ok)))
+
+
+(defun teamcity-send-delete-request (request request-data)
+  (let* ((buf (generate-new-buffer "teamcity-rest-response"))
+         (url-request-method "DELETE")
+         (url-request-data request-data)
+         (url (teamcity-get-rest-url request)))
+	  (with-current-buffer buf
+      (url-retrieve-synchronously url)
+      'ok)))
+
+
+(defun teamcity-rest-xml (request)
+  "Sends TeamCity REST request and returns a parsed xml"
+  (let* ((buf (teamcity-rest-buffer request))
+         (xml (with-current-buffer buf
+                (xml-parse-region (point-min)
+                                  (point-max)
+                                  (current-buffer)))))
+    (kill-buffer buf)
+    xml))
+
+
+(defun teamcity-rest-text (request)
+  "Sends TeamCity REST request and returns a response as a text"
+  (let* ((buf (teamcity-rest-buffer request))
+         (response (with-current-buffer buf
+                     (buffer-string))))
+    (kill-buffer buf)
+    response))
 
 
 (provide 'teamcity)
