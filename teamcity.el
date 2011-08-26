@@ -494,8 +494,8 @@
     (define-key map (kbd "q") 'bury-buffer)
     (define-key map (kbd "j") 'next-line)
     (define-key map (kbd "k") 'previous-line)
-    (define-key map (kbd "u") 'cua-scroll-down)
-    (define-key map (kbd "d") 'cua-scroll-up)
+    (define-key map (kbd "u") 'scroll-down)
+    (define-key map (kbd "d") 'scroll-up)
     map))
 
 
