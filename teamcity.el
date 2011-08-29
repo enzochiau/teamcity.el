@@ -118,7 +118,8 @@
                  (insert (propertize (concat "  " (teamcity-get-field bt 'name) "\n")
                                      'id (teamcity-get-field bt 'id)
                                      'open 'teamcity-open-buildtype
-                                     'face 'teamcity-buildtype)))
+                                     'face 'teamcity-buildtype
+                                     'weburl (teamcity-get-field bt 'webUrl))))
                (put-text-property start end 'project-details-loaded 'yes))))
       (goto-char (+ start 1))
       (insert-and-inherit "-")
@@ -164,6 +165,8 @@
     (switch-to-buffer buffer)
     (make-local-variable 'teamcity-buildtype-id)
     (setq teamcity-buildtype-id btid)
+    (make-local-variable 'teamcity-weburl)
+    (setq teamcity-weburl (teamcity-get-field details 'webUrl))
     (teamcity-set-refresh-fn 'teamcity-refresh-buildtype)))
 
 
@@ -211,7 +214,8 @@
                  'pinned pinned
                  'build build
                  'number-width number-width
-                 'status-width status-width))))
+                 'status-width status-width
+                 'weburl (teamcity-get-field build 'webUrl)))))
 
 
 (defun teamcity-get-bt-build-line (build number-width status-width pinned percent-str)
@@ -275,7 +279,7 @@
     (list (cons 'id id)
           (cons 'name name)
           (cons 'project-name project-name)
-          (cons 'weburl webUrl))))
+          (cons 'webUrl webUrl))))
 
 
 (defun teamcity-buildtype-get-fullname (bt)
@@ -327,12 +331,14 @@
         (number (xml-get-attribute xml 'number))
         (status (xml-get-attribute xml 'status))
         (start (xml-get-attribute xml 'startDate))
-        (percentage (xml-get-attribute-or-nil xml 'percentageComplete)))
+        (percentage (xml-get-attribute-or-nil xml 'percentageComplete))
+        (webUrl (xml-get-attribute-or-nil xml 'webUrl)))
     (list (cons 'id id)
           (cons 'number number)
           (cons 'status status)
           (cons 'start (teamcity-parse-date start))
-          (cons 'percentage percentage))))
+          (cons 'percentage percentage)
+          (cons 'webUrl webUrl))))
 
 
 (defun teamcity-parse-date (date)
@@ -432,6 +438,7 @@
     (define-key map (kbd "k") 'previous-line)
     (define-key map (kbd "u") 'scroll-down)
     (define-key map (kbd "d") 'scroll-up)
+    (define-key map (kbd "v") 'teamcity-visit-in-browser)
     map))
 
 
@@ -443,7 +450,7 @@
 
 
 (defun teamcity-mode ()
-  ""
+  "TeamCity major mode"
   (interactive)
   (kill-all-local-variables)
   (buffer-disable-undo)
@@ -623,6 +630,21 @@
                      (buffer-string))))
     (kill-buffer buf)
     response))
+
+
+(defun teamcity-visit-in-browser ()
+  "Open object at point in the browser"
+  (interactive)
+  (let ((url (teamcity-get-weburl)))
+    (if url
+        (browse-url url)
+      (message "Nothing to visit"))))
+
+
+(defun teamcity-get-weburl ()
+  (or (get-text-property (point) 'weburl)
+      (and (local-variable-p 'teamcity-weburl (current-buffer))
+           (buffer-local-value 'teamcity-weburl (current-buffer)))))
 
 
 (provide 'teamcity)
