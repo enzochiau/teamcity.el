@@ -23,6 +23,11 @@
   :group 'teamcity
   :type 'int)
 
+(defcustom teamcity-autorefresh-interval-sec 30
+  "Autorefresh interval in seconds."
+  :group 'teamcity
+  :type 'int)
+
 (defgroup teamcity-faces nil
   "Customize TeamCity UI"
   :prefix "teamcity-"
@@ -159,13 +164,19 @@
 
 
 (defun teamcity-show-buildtype (btid)
+  (let* ((buffer (get-buffer-create (concat "*TeamCity: Build Configuration " btid "*"))))
+    (teamcity-show-buildtype* btid buffer)
+    (switch-to-buffer buffer)))
+
+
+(defun teamcity-show-buildtype* (btid buffer)
   (let* ((details (teamcity-get-buildtype-details btid))
          (builds (teamcity-get-builds :buildType btid :count teamcity-builds-count))
          (running-builds (teamcity-get-builds :buildType btid :running "true"))
-         (buffer (get-buffer-create (concat "*TeamCity: Build Configuration " btid "*")))
          (pos (and (eq (current-buffer) buffer) (point)))
          (inhibit-read-only t))
     (set-buffer buffer)
+    (teamcity-turn-off-auto-refresh)
     (erase-buffer)
     (teamcity-show-bt-header details)
     (teamcity-show-bt-builds running-builds "Running builds:")
@@ -174,17 +185,29 @@
     (goto-char (or pos (point-min)))
     (teamcity-mode)
     (teamcity-buildtype-mode)
-    (switch-to-buffer buffer)
     (make-local-variable 'teamcity-buildtype-id)
     (setq teamcity-buildtype-id btid)
     (make-local-variable 'teamcity-weburl)
     (setq teamcity-weburl (teamcity-get-field details 'webUrl))
-    (teamcity-set-refresh-fn 'teamcity-refresh-buildtype)))
+    (teamcity-set-refresh-fn 'teamcity-refresh-buildtype)
+    (make-local-variable 'teamcity-autorefresh-timer)
+    (setq teamcity-autorefresh-timer
+          (run-at-time (concat (number-to-string teamcity-autorefresh-interval-sec) " sec")
+                       nil
+                       (teamcity-mk-buildtype-refresh-fn btid buffer)))
+    (add-hook 'kill-buffer-hook 'teamcity-turn-off-auto-refresh)))
 
 
 (defun teamcity-refresh-buildtype ()
   (let ((id (buffer-local-value 'teamcity-buildtype-id (current-buffer))))
     (teamcity-show-buildtype id)))
+
+
+(defun teamcity-mk-buildtype-refresh-fn (btid buffer)
+  (lexical-let ((id btid)
+                (buf buffer))
+    (lambda ()
+      (teamcity-show-buildtype* id buf))))
 
 
 (defun teamcity-show-bt-header (bt-details)
@@ -658,6 +681,13 @@
       (and (get-text-property (point) 'weburl-fn) (funcall (get-text-property (point) 'weburl-fn)))
       (and (local-variable-p 'teamcity-weburl (current-buffer))
            (buffer-local-value 'teamcity-weburl (current-buffer)))))
+
+
+(defun teamcity-turn-off-auto-refresh ()
+  (let ((timer (and (local-variable-p 'teamcity-autorefresh-timer (current-buffer))
+                    (buffer-local-value 'teamcity-autorefresh-timer (current-buffer)))))
+    (if timer
+        (cancel-timer timer))))
 
 
 (provide 'teamcity)
