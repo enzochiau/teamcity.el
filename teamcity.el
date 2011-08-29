@@ -95,7 +95,20 @@
                'id (teamcity-get-field p 'id)
                'expand 'teamcity-project-expand
                'collapse 'teamcity-project-collapse
+               'weburl-fn 'teamcity-project-get-weburl
                'face 'teamcity-project)))
+
+
+(defun teamcity-project-get-weburl ()
+  (let* ((project-id (get-text-property (point) 'id))
+         (project-details (teamcity-project-get-details project-id)))
+    (teamcity-get-field project-details 'webUrl)))
+
+
+(defun teamcity-project-get-details (id)
+  (let* ((project-details-request (concat "projects/id:" project-id))
+         (project-details-xml (teamcity-rest-xml project-details-request)))
+    (teamcity-parse-project-details project-details-xml)))
 
 
 (defun teamcity-project-expand ()
@@ -110,9 +123,7 @@
                (insert contents)))
             (t
              (let* ((project-id (get-text-property (point) 'id))
-                    (project-details-request (concat "projects/id:" project-id))
-                    (project-details-xml (teamcity-rest-xml project-details-request))
-                    (project-details (teamcity-parse-project-details project-details-xml)))
+                    (project-details (teamcity-project-get-details project-id)))
                (move-beginning-of-line 2)
                (dolist (bt (teamcity-get-field project-details 'buildTypes) nil)
                  (insert (propertize (concat "  " (teamcity-get-field bt 'name) "\n")
@@ -120,7 +131,8 @@
                                      'open 'teamcity-open-buildtype
                                      'face 'teamcity-buildtype
                                      'weburl (teamcity-get-field bt 'webUrl))))
-               (put-text-property start end 'project-details-loaded 'yes))))
+               (put-text-property start end 'project-details-loaded 'yes)
+               (put-text-property start end 'weburl (teamcity-get-field project-details 'webUrl)))))
       (goto-char (+ start 1))
       (insert-and-inherit "-")
       (delete-region start (+ start 1)))))
@@ -643,6 +655,7 @@
 
 (defun teamcity-get-weburl ()
   (or (get-text-property (point) 'weburl)
+      (and (get-text-property (point) 'weburl-fn) (funcall (get-text-property (point) 'weburl-fn)))
       (and (local-variable-p 'teamcity-weburl (current-buffer))
            (buffer-local-value 'teamcity-weburl (current-buffer)))))
 
