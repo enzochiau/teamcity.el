@@ -172,8 +172,12 @@
 (defun teamcity-show-buildtype* (btid buffer)
   (let* ((details (teamcity-get-buildtype-details btid))
          (builds (teamcity-get-builds :buildType btid :count teamcity-builds-count))
-         (running-builds (teamcity-get-builds :buildType btid :running "true"))
-         (pos (and (eq (current-buffer) buffer) (point)))
+         (running-builds (teamcity-get-builds :buildType btid :running "true")))
+    (teamcity-show-buildtype** btid buffer details builds running-builds)))
+
+
+(defun teamcity-show-buildtype** (btid buffer details builds running-builds)
+  (let* ((pos (and (eq (current-buffer) buffer) (point)))
          (inhibit-read-only t))
     (set-buffer buffer)
     (teamcity-turn-off-auto-refresh)
@@ -194,7 +198,7 @@
     (setq teamcity-autorefresh-timer
           (run-at-time (concat (number-to-string teamcity-autorefresh-interval-sec) " sec")
                        nil
-                       (teamcity-mk-buildtype-refresh-fn btid buffer)))
+                       (teamcity-mk-buildtype-refresh-fn btid buffer details)))
     (add-hook 'kill-buffer-hook 'teamcity-turn-off-auto-refresh)))
 
 
@@ -203,11 +207,18 @@
     (teamcity-show-buildtype id)))
 
 
-(defun teamcity-mk-buildtype-refresh-fn (btid buffer)
+(defun teamcity-mk-buildtype-refresh-fn (btid buffer details)
   (lexical-let ((id btid)
-                (buf buffer))
+                (buf buffer)
+                (det details))
     (lambda ()
-      (teamcity-show-buildtype* id buf))))
+      (teamcity-get-builds-async (teamcity-build-locator :buildType id :count teamcity-builds-count)
+                               (lambda (builds)
+                                 (lexical-let ((builds builds))
+                                   (teamcity-get-builds-async (teamcity-build-locator :buildType id :running "true")
+                                                              (lambda (running-builds)
+                                                                (lexical-let ((running-builds running-builds))
+                                                                  (teamcity-show-buildtype** id buf det builds running-builds))))))))))
 
 
 (defun teamcity-show-bt-header (bt-details)
@@ -239,26 +250,23 @@
 
 
 (defun teamcity-show-bt-build (build number-width status-width)
-  (let ((pinned (teamcity-is-build-pinned (teamcity-get-field build 'id)))
-        (percent-str (teamcity-get-build-percentage-str build)))
+  (let ((percent-str (teamcity-get-build-percentage-str build)))
     (insert
-     (propertize (teamcity-get-bt-build-line build number-width status-width pinned percent-str)
+     (propertize (teamcity-get-bt-build-line build number-width status-width percent-str)
                  'face (teamcity-build-get-face build)
                  'id (teamcity-get-field build 'id)
                  'teamcity-object-type 'build
-                 'pinned pinned
                  'build build
                  'number-width number-width
                  'status-width status-width
                  'weburl (teamcity-get-field build 'webUrl)))))
 
 
-(defun teamcity-get-bt-build-line (build number-width status-width pinned percent-str)
+(defun teamcity-get-bt-build-line (build number-width status-width percent-str)
   (concat "+ "  (teamcity-ljust (teamcity-get-field build 'number) number-width)
           "   " (teamcity-format-date (teamcity-get-field build 'start))
           "   " (teamcity-rjust (teamcity-get-field build 'status) status-width)
           (if percent-str (concat "   " percent-str))
-          (if pinned "    pinned")
           "\n"))
 
 
@@ -303,6 +311,16 @@
   (let* ((request (concat "buildTypes/" id))
          (response (teamcity-rest-xml request)))
     (teamcity-parse-buildtype-details response)))
+
+
+(defun teamcity-get-buildtype-details-async (id callback)
+    (let ((request (concat "buildTypes/" id)))
+      (teamcity-rest-xml-async
+       request
+       (lexical-let ((cbk callback))
+         (lambda (xml)
+          (let ((details (teamcity-parse-buildtype-details xml)))
+            (funcall cbk details)))))))
 
 
 (defun teamcity-parse-buildtype-details (xml)
@@ -353,6 +371,21 @@
   (let* ((request (apply 'teamcity-builds-request build-locator))
          (response (teamcity-rest-xml request)))
     (teamcity-parse-builds response)))
+
+
+(defun teamcity-get-builds-async (build-locator callback)
+  (let ((request (apply 'teamcity-builds-request build-locator)))
+    (teamcity-rest-xml-async
+     request
+     (lexical-let ((cbk callback))
+       (lambda (xml)
+         (let* ((builds (teamcity-parse-builds xml))
+                (builds-with-pin nil))
+           (funcall cbk builds)))))))
+
+
+(defun teamcity-build-locator (&rest build-locator)
+  build-locator)
 
 
 (defun teamcity-parse-builds (xml)
@@ -479,7 +512,6 @@
 
 (defvar teamcity-buildtype-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "p") 'teamcity-toggle-build-pin)
     (define-key map (kbd "r") 'teamcity-run-build)
     map))
 
@@ -656,6 +688,35 @@
                                   (current-buffer)))))
     (kill-buffer buf)
     xml))
+
+
+(defun teamcity-rest-xml-async (request callback)
+  (let ((url (teamcity-get-rest-url request))
+        (url-show-status nil))
+    (url-retrieve
+     url
+     (teamcity-mk-xml-callback callback))))
+
+
+(defun teamcity-mk-xml-callback (callback)
+  (lexical-let ((cbk callback))
+    (lambda (x) (teamcity-invoke-callback-with-xml cbk))))
+
+
+(defun teamcity-invoke-callback-with-xml (callback)
+  (teamcity-delete-http-headers)
+  (let ((xml (xml-parse-region (point-min) (point-max) (current-buffer))))
+    (funcall callback xml)))
+
+
+(defun teamcity-delete-http-headers ()
+  "Delete http headers from current buffer"
+  (goto-char (point-min))
+  (when (looking-at "^HTTP/1.*$")
+        (re-search-forward "^$" nil t 1)
+        (setq headers (buffer-substring-no-properties (point-min) (point))))
+  (delete-region (+ (point) 1) (point-min))
+  headers)
 
 
 (defun teamcity-rest-text (request)
