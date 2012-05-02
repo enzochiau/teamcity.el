@@ -1,7 +1,7 @@
 ;;;; Emacs TeamCity Client
 
 (require 'cl)
-
+(require 'thread-dump)
 
 (defgroup teamcity nil
   "Emacs interface for TeamCity."
@@ -750,5 +750,20 @@
     (if timer
         (cancel-timer timer))))
 
+
+(defun teamcity-show-thread-dump ()
+  "Show TeamCity server thread dump"
+  (interactive)
+  (let ((thread-dump-buffer (teamcity-get-thread-dump-buffer)))
+    (set-buffer thread-dump-buffer)
+    (url-insert-file-contents (teamcity-thread-dump-url))
+    (switch-to-buffer thread-dump-buffer)
+    (thread-dump-mode)))
+
+(defun teamcity-get-thread-dump-buffer ()
+  (get-buffer-create (concat "TeamCity-thread-dump " (format-time-string "%y.%m.%d %H:%M:%S"))))
+
+(defun teamcity-thread-dump-url () 
+  (concat "http://" teamcity-username "@" teamcity-server "/httpAuth/admin/diagnostic.html?actionName=threadDump&save=false"))
 
 (provide 'teamcity)
