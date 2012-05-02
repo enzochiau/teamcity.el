@@ -28,6 +28,11 @@
   :group 'teamcity
   :type 'int)
 
+(defcustom teamcity-thread-dump-dir "~/tmp"
+  "Directory to store thread dumps."
+  :group 'teamcity
+  :type 'directory)
+
 (defgroup teamcity-faces nil
   "Customize TeamCity UI"
   :prefix "teamcity-"
@@ -754,16 +759,35 @@
 (defun teamcity-show-thread-dump ()
   "Show TeamCity server thread dump"
   (interactive)
-  (let ((thread-dump-buffer (teamcity-get-thread-dump-buffer)))
+  (let* ((thread-dump-buffer-name (teamcity-thread-dump-name))
+         (thread-dump-buffer (get-buffer-create thread-dump-buffer-name)))
     (set-buffer thread-dump-buffer)
     (url-insert-file-contents (teamcity-thread-dump-url))
     (switch-to-buffer thread-dump-buffer)
     (thread-dump-mode)))
 
-(defun teamcity-get-thread-dump-buffer ()
-  (get-buffer-create (concat "TeamCity-thread-dump " (format-time-string "%y.%m.%d %H:%M:%S"))))
+(defun teamcity-save-thread-dump (start-time)
+  (with-temp-buffer
+    (let ((current-date (format-time-string "%y.%m.%d"))
+          (thread-dump-name (teamcity-thread-dump-name)))
+      (url-insert-file-contents (teamcity-thread-dump-url))
+      (set-visited-file-name (expand-file-name (concat teamcity-thread-dump-dir "/" current-date "/" start-time "/" thread-dump-name)))
+      (save-buffer))))
+
+(defun teamcity-show-thread-dump-and-schedule (start-time counter)
+  (message start-time)
+  (teamcity-save-thread-dump start-time)
+  (if (< counter 10)
+      (run-at-time "1 sec" nil 'teamcity-show-thread-dump-and-schedule start-time (+ counter 1))))
+
+(defun teamcity-thread-dump-name ()
+  (concat "TeamCity-thread-dump " (format-time-string "%y.%m.%d %H:%M:%S")))
 
 (defun teamcity-thread-dump-url () 
   (concat "http://" teamcity-username "@" teamcity-server "/httpAuth/admin/diagnostic.html?actionName=threadDump&save=false"))
+
+(defun teamcity-profile ()
+  (interactive)
+  (run-at-time "2 sec" nil 'teamcity-show-thread-dump-and-schedule (format-time-string "%H_%M") 0))
 
 (provide 'teamcity)
