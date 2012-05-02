@@ -23,7 +23,7 @@
   :group 'teamcity
   :type 'int)
 
-(defcustom teamcity-autorefresh-interval-sec 30
+(defcustom teamcity-autorefresh-interval-sec 0
   "Autorefresh interval in seconds."
   :group 'teamcity
   :type 'int)
@@ -199,12 +199,13 @@
     (make-local-variable 'teamcity-weburl)
     (setq teamcity-weburl (teamcity-get-field details 'webUrl))
     (teamcity-set-refresh-fn 'teamcity-refresh-buildtype)
-    (make-local-variable 'teamcity-autorefresh-timer)
-    (setq teamcity-autorefresh-timer
-          (run-at-time (concat (number-to-string teamcity-autorefresh-interval-sec) " sec")
-                       nil
-                       (teamcity-mk-buildtype-refresh-fn btid buffer details)))
-    (add-hook 'kill-buffer-hook 'teamcity-turn-off-auto-refresh)))
+    (when (> teamcity-autorefresh-interval-sec 0)
+      (make-local-variable 'teamcity-autorefresh-timer)
+      (setq teamcity-autorefresh-timer
+            (run-at-time (concat (number-to-string teamcity-autorefresh-interval-sec) " sec")
+                         nil
+                         (teamcity-mk-buildtype-refresh-fn btid buffer details)))
+      (add-hook 'kill-buffer-hook 'teamcity-turn-off-auto-refresh))))
 
 
 (defun teamcity-refresh-buildtype ()
